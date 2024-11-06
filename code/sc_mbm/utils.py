@@ -100,25 +100,54 @@ def load_model(config, model, checkpoint_path ):
     model.load_state_dict(checkpoint['model'])
     print(f'Model loaded with {checkpoint_path}')
 
-def patchify(imgs, patch_size):
+def patchify(self, input_data):
     """
-    imgs: (N, 1, num_voxels)
-    x: (N, L, patch_size)
-    """
-    p = patch_size
-    assert imgs.ndim == 3 and imgs.shape[2] % p == 0
-
-    h = imgs.shape[2] // p
-    x = imgs.reshape(shape=(imgs.shape[0], h, p))
-    return x
-
-def unpatchify(x, patch_size):
-    """
-    x: (N, L, patch_size)
-    imgs: (N, 1, num_voxels)
-    """
-    p = patch_size
-    h = x.shape[1]
+    input_data: (batch_size, num_channels, sequence_length)
+        - batch_size: The number of samples
+        - num_channels: The number of channels
+        - sequence_length: The length of the sequence or time dimension
+        
+    Returns:
+    patches: (batch_size, num_patches, patch_size)
     
-    imgs = x.reshape(shape=(x.shape[0], 1, h * p))
-    return imgs
+    This function splits the input data into patches along the sequence dimension.
+    By reshaping the input into smaller segments, patchify establishes a high-capacity 
+    representation space. This can increase the information capacity by using a larger 
+    embedding-to-patch-size ratio.
+    """
+    patch_size = self.patch_embed.patch_size
+    
+    # Ensure the sequence length is evenly divisible by the patch size
+    assert input_data.ndim == 3 and input_data.shape[2] % patch_size == 0
+
+    # Calculate the number of patches along the sequence dimension
+    num_patches = input_data.shape[2] // patch_size
+    
+    # Reshape input data to create patches of size (patch_size) along the sequence dimension
+    patches = input_data.reshape(shape=(input_data.shape[0], num_patches, patch_size))
+    
+    return patches
+
+
+def unpatchify(self, patch_sequence):
+    """
+    patch_sequence: (batch_size, num_patches, patch_size)
+        - batch_size: The number of samples
+        - num_patches: The number of patches along the sequence dimension
+        - patch_size: The size of each patch
+        
+    Returns:
+    reconstructed_data: (batch_size, num_channels, sequence_length)
+        - num_channels: Restored to 1 (since it was split into patches)
+        - sequence_length: The length of the original sequence (num_patches * patch_size)
+        
+    This function reverses the patchify operation, reconstructing the original
+    data by combining patches back into the full sequence along the time dimension.
+    """
+    patch_size = self.patch_embed.patch_size
+    num_patches = patch_sequence.shape[1]
+    
+    # Reshape patches to reconstruct the original sequence length
+    reconstructed_data = patch_sequence.reshape(shape=(patch_sequence.shape[0], 1, num_patches * patch_size))
+    
+    return reconstructed_data
